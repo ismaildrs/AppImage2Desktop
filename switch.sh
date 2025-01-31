@@ -1,23 +1,64 @@
 #!/bin/bash
 
-file=$1
-fileName="" # AppImage filename
-filePath=""
-localAppPath="~/.local/bin"
-systemWideAppPath="/opt"
-localFilePath="~/.local/share/applications/" # for .desktop files in local mode
-systemWideFilePath="/usr/share/applications/" # // in system-wide mode
+file=$1 # file provided by the user
 
+fileName="" # AppImage filename
+filePath="" # Path to the file
+
+state=""
+
+# Where the AppImage should be put
+localAppPath="$(eval echo ~$USER)/.local/bin" 
+globalAppPath="/opt" 
+
+# Where the .desktop should be put
+localFilePath="$(eval echo ~$USER)/.local/share/applications"
+globalFilePath="/usr/share/applications"
+
+# .desktop file variables
 terminal=false # 
 type="Application"
 categories="" # App categories: Utility;Developpement...
 
+# Check user options
+for option in $@
+do
+  case $option in
+    -h, --help)
+      showManual
+    ;;
+    -g, --global)
+      state=true;
+    ;;
+    -l, --local)
+      state=false;
+    ;;
+
+  esac
+done
 
 # Show the app graphics
-hello() {
-  clear
-  echo -e "\e[1;36m$(figlet -f small 'AppImage → Desktop' | lolcat)\e[0m"
-  echo -e "\e[1;32mReduce the burden of manual setup!\e[0m" | lolcat
+manageApp() {
+  checkFile
+  if [ -z $state]; then
+    menu=$state
+  else 
+    menu=$(echo -e "local\nglobal" | fzf-tmux --header="AppImage → Desktop" --reverse)
+  fi
+  case $menu in
+    local)
+      moveAppImageForLocal
+      createDesktopFileForLocal
+      update-desktop-database "$localFilePath"
+      ;;
+    
+    global)
+      checkSudo # Check if command is run in sudo privileges
+      moveAppImageForGlobal
+      createDesktopFileForGlobal
+      update-desktop-database "$globalFilePath"
+      ;;
+  esac
 }
 
 # Get the path to the AppImage From User
@@ -39,47 +80,50 @@ checkFile(){
     echo "File isn't an AppImage"
     exit 1
   fi
+
+  fileNameTemp=$(basename "$file")
+  fileName="${fileNameTemp%.*}"
 }
 
+checkSudo(){
+  if [ $(id -u) -ne 0 ]; then
+    echo "This option should be run with sudo, --help to se usage"
+    exit 1  
+  fi
+}
 
-# Give user options: Global or Local AppImage
-userOptions(){
-
+showManual(){
+  echo -e "a2d or switch.sh: Transform AppImage to Desktop Apps"
+  echo -e "This is not more than a bash script to create a desktop file and move you AppImage into a safe place :)"
+  echo -e "Usage:\na2d [FilePath.sh]\n a2d --local [FilePath.sh]\n a2d --global [FilePath.sh]" 
 }
 
 # Move the AppImage to a safe place
-moveAppImage($option){
+moveAppImageForLocal(){
   chmod +x "$file"
-  if [[$option -e "local"]]; then
-
-    mv "$file" "$localAppPath"
-    filePath="$localAppPath/$file"
-    
-  else if [[$option -e "system-wide"]]; then
-    sudo mv "$file" /opt/
-  fi 
+  cp "$file" "$localAppPath"
+  filePath="$localAppPath/$fileNameTemp" # new file path
 }
 
-# Create a .desktop file 
-createDesktopFile($option){
-  if [[ $option -e "local" ]]; then
-    desktopFilePath=$localFilePath/$fileName.desktop
-    touch "$desktopFilePath"
-    echo "Name=$filename
-          Exec=$
-          Icon=/path/to/icon.png
-          Terminal=false
-          Type=Application
-          Categories=Utility;
-          StartupWMClass=your_app
-          " >> "$desktopFilePath"
+moveAppImageForGlobal(){
+  chmod +x "$file"
+  cp "$file" "$globalAppPath"
+  filePath="$globalAppPath/$fileNameTemp"
 }
 
-# Update the apps database
-updateAppDatabase(){
+# # Create a .desktop file 
+createDesktopFileForLocal(){
+  desktopFilePath=$localFilePath/$fileName.desktop
+  touch "$desktopFilePath"
+  echo -e "[Desktop Entry]\nName=$fileName\nExec=$filePath\nIcon=/path/to/icon.png\nTerminal=false\nType=Application\nCategories=Utility" > "$desktopFilePath"
+}
 
+createDesktopFileForGlobal(){
+  desktopFilePath=$globalFilePath/$fileName.desktop
+  touch "$desktopFilePath"
+  echo -e "[Desktop Entry]\nName=$fileName\nExec=$filePath\nIcon=/path/to/icon.png\nTerminal=false\nType=Application\nCategories=Utility" > "$desktopFilePath"
 }
 
 # Execute commands
-hello
-checkFile
+checkOptions
+manageApp
