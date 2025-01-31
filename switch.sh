@@ -1,18 +1,22 @@
 #!/bin/bash
 
-file=$1 # file provided by the user
+file="${@: -1}"  # file provided by the user
 
 fileName="" # AppImage filename
 filePath="" # Path to the file
 
-state=""
+
+options=@
+nbOpt=$(($#+1))
+
+echo $nbOpt
 
 # Where the AppImage should be put
-localAppPath="$(eval echo ~$USER)/.local/bin" 
+localAppPath="$HOME/.local/bin" 
 globalAppPath="/opt" 
 
 # Where the .desktop should be put
-localFilePath="$(eval echo ~$USER)/.local/share/applications"
+localFilePath="$HOME/.local/share/applications"
 globalFilePath="/usr/share/applications"
 
 # .desktop file variables
@@ -21,26 +25,36 @@ type="Application"
 categories="" # App categories: Utility;Developpement...
 
 # Check user options
-for option in $@
-do
-  case $option in
-    -h, --help)
-      showManual
-    ;;
-    -g, --global)
-      state=true;
-    ;;
-    -l, --local)
-      state=false;
-    ;;
+checkOptions(){
+  for i in $(seq 1 $nbOpt);
+  do
+    option="${!i}"
+    echo $option
+    case $option in
+      -h | --help )
+        showManual
+        exit 0
+      ;;
+      -g | --global )
+        state=true
+      ;;
+      -l | --local )
+        state=false
+      ;;
+      * )
+        echo "Unknown option: $option"
+        exit 1
+      ;;
+    esac
+  done
+}
 
-  esac
-done
+
 
 # Show the app graphics
 manageApp() {
   checkFile
-  if [ -z $state]; then
+  if [ -v state ]; then
     menu=$state
   else 
     menu=$(echo -e "local\nglobal" | fzf-tmux --header="AppImage → Desktop" --reverse)
@@ -95,7 +109,7 @@ checkSudo(){
 showManual(){
   echo -e "a2d or switch.sh: Transform AppImage to Desktop Apps"
   echo -e "This is not more than a bash script to create a desktop file and move you AppImage into a safe place :)"
-  echo -e "Usage:\na2d [FilePath.sh]\n a2d --local [FilePath.sh]\n a2d --global [FilePath.sh]" 
+  echo -e "Usage:\na2d [options] [FilePath.sh]\na2d --local [FilePath.sh]\na2d --global [FilePath.sh]" 
 }
 
 # Move the AppImage to a safe place
@@ -127,3 +141,6 @@ createDesktopFileForGlobal(){
 # Execute commands
 checkOptions
 manageApp
+
+
+exit 0
