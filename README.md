@@ -23,7 +23,7 @@ sudo bash install.sh
 - Displays a progress bar during installation
 - Shows a success message upon completion
 
-## 🖱️ Usage Modes
+## Usage Modes
 
 ### 1. Terminal User Interface (TUI)
 
